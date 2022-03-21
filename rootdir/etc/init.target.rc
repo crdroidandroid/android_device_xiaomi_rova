@@ -51,9 +51,9 @@ on fs
 
     chown root system /mnt/vendor/persist
     chmod 0771 /mnt/vendor/persist
+    restorecon_recursive /mnt/vendor/persist
     mkdir /mnt/vendor/persist/data 0700 system system
     mkdir /mnt/vendor/persist/bms 0700 root system
-    restorecon_recursive /mnt/vendor/persist
 
 on post-fs
     # set RLIMIT_MEMLOCK to 64MB
