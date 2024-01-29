@@ -435,6 +435,7 @@ case "$target" in
 
                  if [ $KernelVersionA -ge 4 ] && [ $KernelVersionB -ge 14 ]; then
                      setprop init.svc.vendor.qrtrns.enable 1
+                     setprop ro.sf.disable_triple_buffer 1
                  fi
                  ;;
            esac
