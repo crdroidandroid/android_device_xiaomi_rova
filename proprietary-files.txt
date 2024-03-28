@@ -540,7 +540,7 @@ vendor/lib64/vendor.qti.hardware.cacert@1.0.so
 
 # CNE
 -system_ext/app/DynamicDDSService/DynamicDDSService.apk
--vendor/app/CneApp/CneApp.apk
+-vendor/app/CneApp/CneApp.apk;REQUIRED=CneApp.libvndfwk_detect_jni.qti_symlink
 -vendor/app/IWlanService/IWlanService.apk
 product/etc/permissions/vendor.qti.hardware.data.connection-V1.0-java.xml
 product/etc/permissions/vendor.qti.hardware.data.connection-V1.1-java.xml
