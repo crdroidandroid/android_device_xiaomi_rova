@@ -108,6 +108,10 @@ on boot && property:ro.boot.bootdevice=7864900.sdhci
     symlink /dev/block/platform/soc/7824900.sdhci/by-name/fsc /dev/block/bootdevice/by-name/fsc
     symlink /dev/block/platform/soc/7824900.sdhci/by-name/fsg /dev/block/bootdevice/by-name/fsg
 
+# USB
+on property:ro.product.vendor.model=*
+    setprop vendor.usb.product_string ${ro.product.vendor.model}
+
 on property:sys.boot_completed=1
     restart time_daemon
 
