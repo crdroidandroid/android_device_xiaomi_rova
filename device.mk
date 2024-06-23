@@ -531,5 +531,14 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/wifi/WCNSS_cfg.dat:$(TARGET_COPY_OUT_VENDOR)/firmware/wlan/prima/WCNSS_cfg.dat \
     $(LOCAL_PATH)/wifi/WCNSS_qcom_cfg.ini:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/WCNSS_qcom_cfg.ini
 
+# Wifi firmware symlinks
+ifneq ($(TARGET_EXCLUDE_DEFAULT_WIFI_FIRMWARE_SYMLINKS),true)
+PRODUCT_PACKAGES += \
+    firmware_wlan_mac.bin_symlink \
+    firmware_WCNSS_qcom_cfg.ini_symlink \
+    firmware_WCNSS_qcom_wlan_nv.bin_symlink \
+    firmware_WCNSS_wlan_dictionary.dat_symlink
+endif
+
 # Inherit the proprietary files
 $(call inherit-product, vendor/xiaomi/rova/rova-vendor.mk)
