@@ -16,6 +16,9 @@ mithorium_firmware_wlan_mac_bin_install_symlink {
     soong_config_variables: {
         SYMLINK_TARGET: {
             symlink_target: "%s",
+            conditions_default: {
+                symlink_target: "/mnt/vendor/persist/wlan_mac.bin",
+            },
         },
     },
 }
