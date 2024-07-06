@@ -220,6 +220,7 @@ PRODUCT_PACKAGES += \
     android.hidl.manager@1.0
 
 PRODUCT_PACKAGES += \
+    libhidlmemory.vendor:64 \
     libhidltransport \
     libhidltransport.vendor \
     libhwbinder \
