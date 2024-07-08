@@ -1245,3 +1245,4 @@ vendor/lib64/libaoa.so
 # WLAN
 vendor/bin/ptt_socket_app
 vendor/bin/wcnss_service
+vendor/bin/hw/wpa_supplicant
