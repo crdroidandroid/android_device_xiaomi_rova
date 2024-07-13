@@ -425,8 +425,6 @@ case "$target" in
 esac
 case "$target" in
        "msm8937")
-          case "$soc_hwid" in
-              386|354|353|303)
                  # enable qrtr-ns service for kernel 4.14 or above
                  KernelVersionStr=`cat /proc/sys/kernel/osrelease`
                  KernelVersionS=${KernelVersionStr:2:2}
@@ -437,8 +435,6 @@ case "$target" in
                      setprop init.svc.vendor.qrtrns.enable 1
                      setprop ro.sf.disable_triple_buffer 1
                  fi
-                 ;;
-           esac
            ;;
  esac
 
