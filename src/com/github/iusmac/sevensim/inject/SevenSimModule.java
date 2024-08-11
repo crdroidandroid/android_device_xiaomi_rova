@@ -50,6 +50,8 @@ public final class SevenSimModule {
             Room.databaseBuilder(context.createDeviceProtectedStorageContext(),
                     AppDatabaseDE.class, "app_database.sqlite");
 
+        builder.addMigrations(AppDatabaseDE.MIGRATION_1_2);
+
         return builder.addTypeConverter(typeConverter).build();
     }
 
@@ -156,6 +158,13 @@ public final class SevenSimModule {
             final @ApplicationContext Context context) {
 
         return ContextCompat.getSystemService(context, DevicePolicyManager.class);
+    }
+
+    @Named("LockedBootCompleted")
+    @Singleton
+    @Provides
+    static SysProp provideLockedBootCompletedSysProp() {
+        return new SysProp("locked_boot_completed", /*isPersistent=*/ false);
     }
 
     /** Do not initialize. */
