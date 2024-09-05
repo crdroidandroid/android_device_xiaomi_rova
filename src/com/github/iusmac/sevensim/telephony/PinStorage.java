@@ -18,6 +18,7 @@ import com.github.iusmac.sevensim.Utils;
 
 import dagger.Lazy;
 
+import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -51,7 +52,7 @@ public final class PinStorage {
      * The {@link SystemClock#elapsedRealtime()}-based time, when the hardware-backed KeyStore has
      * been unlocked.
      */
-    @GuardedBy("this")
+    @GuardedBy("PinStorage.class")
     private static long sLastKeystoreAuthTimestamp;
 
     /** The default duration, in seconds, of the user authentication bound secret key. */
@@ -184,7 +185,7 @@ public final class PinStorage {
         try {
             final Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-            pinEntity.setData(cipher.doFinal(clearPin.getBytes()));
+            pinEntity.setData(cipher.doFinal(clearPin.getBytes(StandardCharsets.US_ASCII)));
             pinEntity.setIV(cipher.getIV());
         } catch (Exception e) {
             mLogger.e("encrypt(pinEntity=%s) : %s", pinEntity, e);
@@ -228,7 +229,8 @@ public final class PinStorage {
             final GCMParameterSpec spec = new GCMParameterSpec(GCM_PARAMETER_TAG_BIT_LEN,
                     pinEntity.getIV());
             cipher.init(Cipher.DECRYPT_MODE, secretKey, spec);
-            pinEntity.setClearPin(new String(cipher.doFinal(pinEntity.getData())));
+            pinEntity.setClearPin(new String(cipher.doFinal(pinEntity.getData()),
+                        StandardCharsets.US_ASCII));
         } catch (Exception e) {
             mLogger.e("decrypt(pinEntity=%s) : %s", pinEntity, e);
             return false;
@@ -377,11 +379,13 @@ public final class PinStorage {
      * Check whether the user should be authenticated with their credentials in order to unlock the
      * hardware-backed KeyStore for further crypto operations.
      */
-    public synchronized boolean isAuthenticationRequired() {
-        final long authTimeout = sLastKeystoreAuthTimestamp == 0 ? 0 : sLastKeystoreAuthTimestamp +
-            DEFAULT_AUTHENTICATION_VALIDITY_DURATION_SECONDS * 1000L;
-        final boolean isKeystoreAuthExpired = authTimeout - SystemClock.elapsedRealtime() < 0;
-        return mKeyguardManagerLazy.get().isDeviceSecure() && isKeystoreAuthExpired;
+    public boolean isAuthenticationRequired() {
+        synchronized (PinStorage.class) {
+            final long authTimeout = sLastKeystoreAuthTimestamp == 0 ? 0 :
+                sLastKeystoreAuthTimestamp + DEFAULT_AUTHENTICATION_VALIDITY_DURATION_SECONDS * 1000L;
+            final boolean isKeystoreAuthExpired = authTimeout - SystemClock.elapsedRealtime() < 0;
+            return mKeyguardManagerLazy.get().isDeviceSecure() && isKeystoreAuthExpired;
+        }
     }
 
     /**

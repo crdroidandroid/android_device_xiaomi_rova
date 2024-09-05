@@ -48,6 +48,7 @@ import androidx.recyclerview.widget.SortedListAdapterCallback;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Base adapter class for displaying a collection of items. Provides functionality for
@@ -149,6 +150,7 @@ public class ItemAdapter<T extends ItemAdapter.ItemHolder<?>>
             }
 
             @Override
+            @SuppressWarnings("ReferenceEquality")
             public boolean areItemsTheSame(final T t0, final T t1) {
                 if (t0.itemId == t1.itemId && t0 != t1) {
                     // At this stage, we already know the items are the same and the new instance
@@ -206,7 +208,7 @@ public class ItemAdapter<T extends ItemAdapter.ItemHolder<?>>
     /**
      * Inserts or updates the specified item holders.
      *
-     * @param itemHolder the item holder to add or update
+     * @param itemHolders the item holder to add or update
      * @return this object, allowing calls to methods in this class to be chained
      */
     public ItemAdapter<?> addItems(@NonNull List<T> itemHolders) {
@@ -246,7 +248,7 @@ public class ItemAdapter<T extends ItemAdapter.ItemHolder<?>>
     /**
      * Removes the item at the given index and calls {@link Callback#onRemoved(int, int)}.
      *
-     * @param index The index of the item to be removed.
+     * @param position The position of the item to be removed.
      *
      * @return The removed item.
      */
@@ -299,6 +301,8 @@ public class ItemAdapter<T extends ItemAdapter.ItemHolder<?>>
     }
 
     /**
+     * See {@link SortedList#recalculatePositionOfItemAt(int)}.
+     *
      * @param position The current item position whose position should be re-calculated according to
      * sorting criteria.
      */
@@ -380,8 +384,8 @@ public class ItemAdapter<T extends ItemAdapter.ItemHolder<?>>
         }
 
         /**
-         * @return the unique identifier for the view that should be used to represent the item,
-         * e.g. the layout resource id.
+         * Return the unique identifier for the view that should be used to represent the item,
+         * e.g., the layout resource id.
          */
         public abstract int getItemViewType();
 
@@ -453,9 +457,14 @@ public class ItemAdapter<T extends ItemAdapter.ItemHolder<?>>
         }
 
         @Override
+        public int hashCode() {
+            return Objects.hash(itemId, item);
+        }
+
+        @Override
         public boolean equals(final Object o) {
             if (o == this) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (o == null || !(o instanceof ItemHolder)) return false;
 
             final ItemHolder<?> compareTo = (ItemHolder<?>) o;
             return compareTo.item.equals(item);
@@ -489,7 +498,7 @@ public class ItemAdapter<T extends ItemAdapter.ItemHolder<?>>
         }
 
         /**
-         * @return the current {@link ItemHolder} bound to this holder, or {@code null} if unbound
+         * Return the current {@link ItemHolder} bound to this holder, or {@code null} if unbound.
          */
         public final T getItemHolder() {
             return mItemHolder;
