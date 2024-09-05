@@ -7,6 +7,7 @@ import androidx.annotation.WorkerThread;
 import com.github.iusmac.sevensim.Logger;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Locale;
 
 import javax.inject.Inject;
@@ -70,11 +71,18 @@ public final class SubscriptionController {
             return;
         }
 
+        // Ensure SIM subscription syncing cannot start in parallel during this operation
+        mSubscriptions.mBlockSubscriptionsSyncFlag.set(true);
+
         sub.setSimState(TelephonyUtils.simStateInt(enabled));
-        sub.setLastActivatedTime(enabled ? LocalDateTime.now() : LocalDateTime.MIN);
-        sub.setLastDeactivatedTime(!enabled ? LocalDateTime.now() : LocalDateTime.MIN);
+        sub.setLastActivatedTime(enabled ? LocalDateTime.now(ZoneId.systemDefault()) :
+                LocalDateTime.MIN);
+        sub.setLastDeactivatedTime(!enabled ? LocalDateTime.now(ZoneId.systemDefault()) :
+                LocalDateTime.MIN);
         mSubscriptions.persistSubscription(sub);
 
         mSubManager.setUiccApplicationsEnabled(subId, enabled);
+
+        mSubscriptions.mBlockSubscriptionsSyncFlag.set(false);
     }
 }
