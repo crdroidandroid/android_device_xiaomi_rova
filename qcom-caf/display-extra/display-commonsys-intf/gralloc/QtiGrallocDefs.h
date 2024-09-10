@@ -93,6 +93,12 @@
 /* This flag is used to indicate UBWC_NV124R format usage */
 #define GRALLOC_USAGE_PRIVATE_ALLOC_UBWC_4R      1ULL << 55
 
+/* This flag is used to indicate UBWC - 8:5 compression ratio */
+#define GRALLOC_USAGE_PRIVATE_UBWC_L_8_TO_5      1ULL << 56
+
+/* This flag is used to indicate UBWC - 2:1 compression ratio */
+#define GRALLOC_USAGE_PRIVATE_UBWC_L_2_TO_1      1ULL << 57
+
 // OEM specific HAL formats
 #define HAL_PIXEL_FORMAT_RGBA_5551 6
 #define HAL_PIXEL_FORMAT_RGBA_4444 7
