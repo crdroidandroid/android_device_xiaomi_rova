@@ -140,12 +140,12 @@ struct private_handle_t {
 #ifdef GRALLOC_HANDLE_HAS_RESERVED_SIZE
         ,reserved_size(0)
 #endif
+#ifdef GRALLOC_HANDLE_HAS_CUSTOM_CONTENT_MD_RESERVED_SIZE
+        ,custom_content_md_reserved_size(0)
+#endif
 #ifdef GRALLOC_HANDLE_HAS_UBWCP_FORMAT
         ,linear_size(0)
         ,ubwcp_format(format)
-#endif
-#ifdef GRALLOC_HANDLE_HAS_CUSTOM_CONTENT_MD_RESERVED_SIZE
-        ,custom_content_md_reserved_size(0)
 #endif
   {
     version = static_cast<int>(sizeof(native_handle));
