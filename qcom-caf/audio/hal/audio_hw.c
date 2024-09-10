@@ -5372,8 +5372,12 @@ int route_output_stream(struct stream_out *out,
     if (is_usb_out_device_type(&new_devices)) {
         struct str_parms *parms =
             str_parms_create_str(get_usb_device_address(&new_devices));
-        if (!parms)
+        if (!parms) {
+            pthread_mutex_unlock(&adev->lock);
+            pthread_mutex_unlock(&out->lock);
+            ret = -ENOSYS;
             goto error;
+        }
         if (!audio_extn_usb_connected(NULL)) {
             ALOGW("%s: ignoring rerouting to non existing USB card", __func__);
             pthread_mutex_unlock(&adev->lock);
@@ -7058,8 +7062,7 @@ static int out_stop(const struct audio_stream_out* stream)
     if (out->usecase == USECASE_AUDIO_PLAYBACK_MMAP && !out->standby &&
             out->playback_started && out->pcm != NULL) {
         pcm_stop(out->pcm);
-        ret = stop_output_stream(out);
-        out->playback_started = false;
+        ret = 0;
     }
     pthread_mutex_unlock(&adev->lock);
     return ret;
@@ -7074,8 +7077,18 @@ static int out_start(const struct audio_stream_out* stream)
     ALOGV("%s", __func__);
     pthread_mutex_lock(&adev->lock);
     if (out->usecase == USECASE_AUDIO_PLAYBACK_MMAP && !out->standby &&
-            !out->playback_started && out->pcm != NULL) {
-        ret = start_output_stream(out);
+             out->pcm != NULL) {
+        /* start of playback after stanby */
+        if (!out->playback_started) {
+            ret = start_output_stream(out);
+        } else {
+            /* When  mmap playback is started within 3 sec after stop. stop -> start */
+            ret = pcm_start(out->pcm);
+            if (ret < 0) {
+                ALOGE("%s: MMAP pcm_start failed ret %d", __func__, ret);
+                stop_output_stream(out);
+            }
+        }
         if (ret == 0) {
             out->playback_started = true;
         }
@@ -7742,9 +7755,13 @@ static ssize_t in_read(struct audio_stream_in *stream, void *buffer,
         (adev->num_va_sessions &&
          in->source != AUDIO_SOURCE_VOICE_RECOGNITION &&
          property_get_bool("persist.vendor.audio.va_concurrency_mute_enabled",
-            false)))
-        memset(buffer, 0, bytes);
+            false))) {
 
+        /* aviod FM usecase muting, upon muting MIC.*/
+        if (in->usecase != USECASE_AUDIO_RECORD_FM_VIRTUAL) {
+            memset(buffer, 0, bytes);
+        }
+    }
 exit:
     frame_size = audio_stream_in_frame_size(stream);
     if (frame_size > 0)
@@ -8329,7 +8346,8 @@ int adev_open_output_stream(struct audio_hw_device *dev,
 
     if (direct_dev &&
         (audio_is_linear_pcm(out->format) ||
-         config->format == AUDIO_FORMAT_DEFAULT)) {
+         config->format == AUDIO_FORMAT_DEFAULT) &&
+        out->flags == AUDIO_OUTPUT_FLAG_NONE) {
         audio_format_t req_format = config->format;
         audio_channel_mask_t req_channel_mask = config->channel_mask;
         uint32_t req_sample_rate = config->sample_rate;
@@ -9126,9 +9144,11 @@ int adev_open_output_stream(struct audio_hw_device *dev,
 
     out->out_ctxt.output = out;
 
+    pthread_mutex_lock(&adev->active_outputs_list_lock);
     pthread_mutex_lock(&adev->lock);
     list_add_tail(&adev->active_outputs_list, &out->out_ctxt.list);
     pthread_mutex_unlock(&adev->lock);
+    pthread_mutex_unlock(&adev->active_outputs_list_lock);
 
     ALOGV("%s: exit", __func__);
     return 0;
@@ -9152,12 +9172,13 @@ void adev_close_output_stream(struct audio_hw_device *dev __unused,
     ALOGD("%s: enter:stream_handle(%s)",__func__, use_case_table[out->usecase]);
 
     io_streams_map_remove(adev, out->handle);
-
+    pthread_mutex_lock(&adev->active_outputs_list_lock);
     // remove out_ctxt early to prevent the stream
     // being opened in a race condition
     pthread_mutex_lock(&adev->lock);
     list_remove(&out->out_ctxt.list);
     pthread_mutex_unlock(&adev->lock);
+    pthread_mutex_unlock(&adev->active_outputs_list_lock);
 
     // must deregister from sndmonitor first to prevent races
     // between the callback and close_stream
@@ -9239,6 +9260,7 @@ void in_set_power_policy(uint8_t enable)
     pthread_mutex_unlock(&adev->lock);
 
     if (!enable) {
+        pthread_mutex_lock(&adev->active_inputs_list_lock);
         list_for_each(node, &adev->active_inputs_list) {
             streams_input_ctxt_t *in_ctxt = node_to_item(node,
                                                          streams_input_ctxt_t,
@@ -9246,6 +9268,7 @@ void in_set_power_policy(uint8_t enable)
             struct stream_in *in = in_ctxt->input;
             in_standby(&in->stream.common);
         }
+        pthread_mutex_unlock(&adev->active_inputs_list_lock);
     }
 
     ALOGD("%s: Exit", __func__);
@@ -9262,6 +9285,7 @@ void out_set_power_policy(uint8_t enable)
     pthread_mutex_unlock(&adev->lock);
 
     if (!enable) {
+        pthread_mutex_lock(&adev->active_outputs_list_lock);
         list_for_each(node, &adev->active_outputs_list) {
             streams_output_ctxt_t *out_ctxt = node_to_item(node,
                                                            streams_output_ctxt_t,
@@ -9269,6 +9293,7 @@ void out_set_power_policy(uint8_t enable)
             struct stream_out *out = out_ctxt->output;
             out_on_error(&out->stream.common);
         }
+        pthread_mutex_unlock(&adev->active_outputs_list_lock);
     }
 
     ALOGD("%s: Exit", __func__);
@@ -10314,7 +10339,7 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
             in->config.period_size = buffer_size / frame_size;
             in->af_period_multiplier = 1;
 
-            if (in->source == AUDIO_SOURCE_VOICE_COMMUNICATION) {
+            if (in->source == AUDIO_SOURCE_VOICE_COMMUNICATION && (!is_pcm_low_latency_record_usecase(in->usecase))) {
                 /* optionally use VOIP usecase depending on config(s) */
                 ret = adev_update_voice_comm_input_stream(in, config);
             }
@@ -10400,9 +10425,11 @@ static int adev_open_input_stream(struct audio_hw_device *dev,
 
     in->in_ctxt.input = in;
 
+    pthread_mutex_lock(&adev->active_inputs_list_lock);
     pthread_mutex_lock(&adev->lock);
     list_add_tail(&adev->active_inputs_list, &in->in_ctxt.list);
     pthread_mutex_unlock(&adev->lock);
+    pthread_mutex_unlock(&adev->active_inputs_list_lock);
 
     ALOGV("%s: exit", __func__);
     return ret;
@@ -10442,11 +10469,13 @@ static void adev_close_input_stream(struct audio_hw_device *dev,
     }
     io_streams_map_remove(adev, in->capture_handle);
 
+    pthread_mutex_lock(&adev->active_inputs_list_lock);
     // remove out_ctxt early to prevent the stream
     // being opened in a race condition
     pthread_mutex_lock(&adev->lock);
     list_remove(&in->in_ctxt.list);
     pthread_mutex_unlock(&adev->lock);
+    pthread_mutex_unlock(&adev->active_inputs_list_lock);
 
     /* must deregister from sndmonitor first to prevent races
      * between the callback and close_stream
@@ -11051,6 +11080,8 @@ static int adev_close(hw_device_t *device)
         audio_extn_auto_hal_deinit();
         free_map(adev->patch_map);
         free_map(adev->io_streams_map);
+        pthread_mutex_destroy(&adev->active_inputs_list_lock);
+        pthread_mutex_destroy(&adev->active_outputs_list_lock);
         free(device);
         adev = NULL;
     }
@@ -11075,6 +11106,16 @@ static int period_size_is_plausible_for_low_latency(int period_size)
     default:
         return 0;
     }
+}
+
+card_status_t snd_card_status()
+{
+    card_status_t card_status = CARD_STATUS_ONLINE;
+    pthread_mutex_lock(&adev->lock);
+    card_status = adev->card_status;
+    pthread_mutex_unlock(&adev->lock);
+    ALOGD("%s: card_status %d:",__func__,card_status);
+    return card_status;
 }
 
 static void adev_snd_mon_cb(void *cookie, struct str_parms *parms)
@@ -11244,6 +11285,8 @@ static int adev_open(const hw_module_t *module, const char *name,
     }
 
     pthread_mutex_init(&adev->lock, (const pthread_mutexattr_t *) NULL);
+    pthread_mutex_init(&adev->active_inputs_list_lock, (const pthread_mutexattr_t *) NULL);
+    pthread_mutex_init(&adev->active_outputs_list_lock, (const pthread_mutexattr_t *) NULL);
 
     // register audio ext hidl at the earliest
     audio_extn_hidl_init();
@@ -11569,6 +11612,8 @@ adev_open_err:
     free_map(adev->io_streams_map);
     free(adev->snd_dev_ref_cnt);
     pthread_mutex_destroy(&adev->lock);
+    pthread_mutex_destroy(&adev->active_inputs_list_lock);
+    pthread_mutex_destroy(&adev->active_outputs_list_lock);
     free(adev);
     adev = NULL;
     *device = NULL;
